@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { letterToPoint } from "../utils/gradeConverter";
+import { useSession } from "next-auth/react";
+import { letterToPoint, pointToLetter } from "../utils/gradeConverter";
 import { calculateTGPA } from "../utils/tgpaCalculator";
+import { migrateLegacyKey, scopedKey } from "../utils/storageKeys";
 
 const GRADE_OPTIONS = ["O", "A+", "A", "B+", "B", "C", "F"];
 
@@ -18,27 +20,31 @@ function createSubject() {
   };
 }
 
-export default function TGPAForm() {
+export default function TGPAForm({ onAddSemester }) {
+  const { data: session } = useSession();
+  const email = session?.user?.email || "";
+  const storageKey = scopedKey("apa_tgpa_subjects", email);
   const [subjects, setSubjects] = useState([createSubject()]);
 
   useEffect(() => {
-    const raw = localStorage.getItem("apa_tgpa_subjects");
+    migrateLegacyKey("apa_tgpa_subjects", email);
+    const raw = localStorage.getItem(storageKey);
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length) setSubjects(parsed);
       } catch {
-        localStorage.removeItem("apa_tgpa_subjects");
+        localStorage.removeItem(storageKey);
       }
     }
-  }, []);
+  }, [email, storageKey]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      localStorage.setItem("apa_tgpa_subjects", JSON.stringify(subjects));
+      localStorage.setItem(storageKey, JSON.stringify(subjects));
     }, 200);
     return () => clearTimeout(timeout);
-  }, [subjects]);
+  }, [subjects, storageKey]);
 
   const { tgpa, totalCredits } = useMemo(() => {
     const rows = subjects.map((s) => ({
@@ -60,6 +66,29 @@ export default function TGPAForm() {
         return updated;
       })
     );
+  };
+
+  const addToSemesterTracker = () => {
+    if (!onAddSemester) return;
+    const cleaned = subjects
+      .map((s) => {
+        const credits = Number(s.credits || 0);
+        const gradePoint = Number(
+          s.inputMode === "letter" ? letterToPoint(s.gradeLetter) : s.gradePoint || 0
+        );
+        if (credits <= 0) return null;
+        return {
+          id: Date.now() + Math.random(),
+          name: s.name || "Subject",
+          credits,
+          gradePoint,
+          gradeLetter: s.inputMode === "letter" ? s.gradeLetter : pointToLetter(gradePoint),
+        };
+      })
+      .filter(Boolean);
+
+    if (!cleaned.length) return;
+    onAddSemester(cleaned);
   };
 
   return (
@@ -152,12 +181,22 @@ export default function TGPAForm() {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <button
-          onClick={() => setSubjects((prev) => [...prev, createSubject()])}
-          className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-        >
-          <Plus size={16} /> Add Subject
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setSubjects((prev) => [...prev, createSubject()])}
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+          >
+            <Plus size={16} /> Add Subject
+          </button>
+          {onAddSemester ? (
+            <button
+              onClick={addToSemesterTracker}
+              className="inline-flex items-center gap-2 rounded-xl border border-brand-300 px-4 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 dark:border-brand-800 dark:text-brand-300 dark:hover:bg-brand-900/30"
+            >
+              Add To Semester Tracker
+            </button>
+          ) : null}
+        </div>
 
         <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm dark:border-brand-900 dark:bg-brand-900/30">
           <p className="font-semibold">Total Credits: {totalCredits.toFixed(2)}</p>

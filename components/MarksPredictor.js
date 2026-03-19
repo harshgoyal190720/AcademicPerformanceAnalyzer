@@ -2,33 +2,39 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { enrichMarksRows, calculatePredictedTGPA } from "../utils/marksPredictor";
+import { migrateLegacyKey, scopedKey } from "../utils/storageKeys";
 
 function createRow() {
   return { id: Date.now() + Math.random(), name: "", credits: "", marks: "" };
 }
 
 export default function MarksPredictor() {
+  const { data: session } = useSession();
+  const email = session?.user?.email || "";
+  const storageKey = scopedKey("apa_marks_rows", email);
   const [rows, setRows] = useState([createRow()]);
 
   useEffect(() => {
-    const raw = localStorage.getItem("apa_marks_rows");
+    migrateLegacyKey("apa_marks_rows", email);
+    const raw = localStorage.getItem(storageKey);
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length) setRows(parsed);
       } catch {
-        localStorage.removeItem("apa_marks_rows");
+        localStorage.removeItem(storageKey);
       }
     }
-  }, []);
+  }, [email, storageKey]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      localStorage.setItem("apa_marks_rows", JSON.stringify(rows));
+      localStorage.setItem(storageKey, JSON.stringify(rows));
     }, 200);
     return () => clearTimeout(timeout);
-  }, [rows]);
+  }, [rows, storageKey]);
 
   const enrichedRows = useMemo(() => enrichMarksRows(rows), [rows]);
   const { tgpa } = useMemo(() => calculatePredictedTGPA(rows), [rows]);

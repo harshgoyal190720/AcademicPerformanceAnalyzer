@@ -4,10 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ArrowRight, Moon, Sun } from "lucide-react";
+import { useSession } from "next-auth/react";
 import TGPAForm from "../../components/TGPAForm";
 import MarksPredictor from "../../components/MarksPredictor";
 import PredictionPanel from "../../components/PredictionPanel";
+import AuthNav from "../../components/AuthNav";
 import { calculateCGPA, calculateTGPA } from "../../utils/tgpaCalculator";
+import { migrateLegacyKey, scopedKey } from "../../utils/storageKeys";
 
 const AnalyticsCharts = dynamic(() => import("../../components/AnalyticsCharts"), {
   ssr: false,
@@ -24,13 +27,17 @@ const ExportPDF = dynamic(() => import("../../components/ExportPDF"), {
 });
 
 export default function DashboardPage() {
+  const { data: session } = useSession();
+  const email = session?.user?.email || "";
+  const semestersStorageKey = scopedKey("apa_semesters", email);
   const [semesters, setSemesters] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
   const [generatedAt, setGeneratedAt] = useState("");
   const reportRef = useRef(null);
 
   useEffect(() => {
-    const savedSemesters = localStorage.getItem("apa_semesters");
+    migrateLegacyKey("apa_semesters", email);
+    const savedSemesters = localStorage.getItem(semestersStorageKey);
     if (savedSemesters) {
       try {
         const parsed = JSON.parse(savedSemesters);
@@ -43,14 +50,14 @@ export default function DashboardPage() {
     const savedTheme = localStorage.getItem("apa_theme");
     if (savedTheme === "dark") setDarkMode(true);
     setGeneratedAt(new Date().toLocaleString());
-  }, []);
+  }, [email, semestersStorageKey]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      localStorage.setItem("apa_semesters", JSON.stringify(semesters));
+      localStorage.setItem(semestersStorageKey, JSON.stringify(semesters));
     }, 250);
     return () => clearTimeout(timeout);
-  }, [semesters]);
+  }, [semesters, semestersStorageKey]);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -81,6 +88,16 @@ export default function DashboardPage() {
 
   const cgpaData = useMemo(() => calculateCGPA(semestersWithStats), [semestersWithStats]);
   const tgpaValues = semestersWithStats.map((s) => s.tgpa);
+  const addTGPAAsSemester = (subjects) => {
+    setSemesters((prev) => [
+      ...prev,
+      {
+        id: Date.now() + Math.random(),
+        name: `Semester ${prev.length + 1}`,
+        subjects,
+      },
+    ]);
+  };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-blue-100 px-4 py-6 text-slate-900 transition dark:from-slate-950 dark:via-slate-900 dark:to-blue-950 dark:text-slate-100 sm:px-6 lg:px-10">
@@ -93,10 +110,11 @@ export default function DashboardPage() {
               </p>
               <h1 className="mt-1 font-heading text-3xl font-bold">Academic Performance Analyzer</h1>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                Generated on {generatedAt || new Date().toLocaleString()}
+                Generated on {generatedAt || "--"}
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <AuthNav />
               <button
                 onClick={() => setDarkMode((v) => !v)}
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold transition hover:border-brand-300 dark:border-slate-700 dark:bg-slate-900"
@@ -123,7 +141,7 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        <section className="mb-5 grid gap-3 sm:grid-cols-2">
+        <section className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Link
             href="/dashboard/target"
             className="card flex items-center justify-between border-brand-200 bg-brand-50/70 dark:border-brand-900 dark:bg-brand-900/25"
@@ -148,11 +166,47 @@ export default function DashboardPage() {
             </div>
             <ArrowRight size={18} />
           </Link>
+          <Link
+            href="/calculator"
+            className="card flex items-center justify-between border-brand-200 bg-brand-50/70 dark:border-brand-900 dark:bg-brand-900/25"
+          >
+            <div>
+              <p className="text-xs font-semibold uppercase text-brand-700 dark:text-brand-300">
+                Protected Route
+              </p>
+              <h2 className="mt-1 font-heading text-lg font-bold">Calculator</h2>
+            </div>
+            <ArrowRight size={18} />
+          </Link>
+          <Link
+            href="/analytics"
+            className="card flex items-center justify-between border-brand-200 bg-brand-50/70 dark:border-brand-900 dark:bg-brand-900/25"
+          >
+            <div>
+              <p className="text-xs font-semibold uppercase text-brand-700 dark:text-brand-300">
+                Protected Route
+              </p>
+              <h2 className="mt-1 font-heading text-lg font-bold">Analytics</h2>
+            </div>
+            <ArrowRight size={18} />
+          </Link>
+          <Link
+            href="/planner"
+            className="card flex items-center justify-between border-brand-200 bg-brand-50/70 dark:border-brand-900 dark:bg-brand-900/25"
+          >
+            <div>
+              <p className="text-xs font-semibold uppercase text-brand-700 dark:text-brand-300">
+                Protected Route
+              </p>
+              <h2 className="mt-1 font-heading text-lg font-bold">Planner</h2>
+            </div>
+            <ArrowRight size={18} />
+          </Link>
         </section>
 
         <div className="space-y-5">
           <section id="tgpa-cgpa" className="scroll-mt-6">
-            <TGPAForm />
+            <TGPAForm onAddSemester={addTGPAAsSemester} />
           </section>
           <section id="predict" className="scroll-mt-6">
             <MarksPredictor />

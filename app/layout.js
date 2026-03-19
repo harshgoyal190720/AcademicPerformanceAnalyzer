@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Mail, Phone, User } from "lucide-react";
+import Providers from "./providers";
 
 export const metadata = {
   title: "Academic Performance Analyzer",
@@ -10,7 +11,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        {children}
+        <Providers>{children}</Providers>
         <footer className="px-4 pb-5 pt-2">
           <div className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-center gap-3 rounded-2xl border border-brand-200 bg-gradient-to-r from-brand-50 via-white to-cyan-50 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm dark:border-brand-900 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 dark:text-slate-200">
             <span className="inline-flex items-center gap-1.5">

@@ -12,6 +12,18 @@ export function letterToPoint(letter) {
   return GRADE_POINTS[letter] ?? 0;
 }
 
+export function pointToLetter(point) {
+  const value = Number(point);
+  if (Number.isNaN(value)) return "F";
+  if (value >= 9.5) return "O";
+  if (value >= 8.5) return "A+";
+  if (value >= 7.5) return "A";
+  if (value >= 6.5) return "B+";
+  if (value >= 5.5) return "B";
+  if (value >= 4.5) return "C";
+  return "F";
+}
+
 export function marksToGrade(marks) {
   const value = Number(marks);
   if (Number.isNaN(value)) return { letter: "F", point: 0 };
